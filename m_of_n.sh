@@ -1,10 +1,5 @@
 #!/bin/sh
 
-# So, flag on argument for each key_id to include
-# Flag to set how many keys of given ones are needed to decrypt
-# Flag to set payload files. - or none is stdin.
-#  Multiple files are each encrypted into their own blocks
-
 # Roughly, for each key, for each other key, until you get to (m-1) you encrypt the payload to the rest of the keys.
 # Then you encypt that to the higher key, and bundle all of those together with tar, and encrypt that to the higher, etc.
 # At the top level you end up with a bunch of files, one for each user, that they can decrypt to get a tarball.
@@ -12,9 +7,9 @@
 # When given to that person, they can decrypt it to get another tarball to give to any of the others (not including the first)
 # The second last person gets a single file that can be decrypted by any of the people who weren't in the path leading to that file.
 
-keys=""
-inputs=""
-n=""
+KEYS=""
+INPUTS=""
+NUM=""
 
 usage() {
 	(
@@ -28,5 +23,46 @@ usage() {
 	) >&2
 }
 
-usage
+while getopts "hn:r:f:" flag; do
+	case "$flag" in
+		n) NUM="$OPTARG";;
+		h)
+			usage
+			exit 0;;
+		r)
+			if echo "meow" | gpg --encrypt -r "$OPTARG" 2> /dev/null > /dev/null; then
+				KEYS="$(printf '%s\n%s\n' "$KEYS" "$OPTARG")"
+			else
+				echo "\"$OPTARG\" is not a valid keyid" >&2
+				exit 1
+			fi;;
+		f) 
+			if [ -r "$OPTARG" -o "$OPTARG" = "-" ]; then
+				FILES="$(printf '%s\n%s\n' "$FILES" "$OPTARG")"
+			else
+				echo "\"$OPTARG\" is not a valid file" >&2
+				exit 1
+			fi;;
+	esac
+done
 
+# Remove first item, which will always be a blank line, and dedupe
+KEYS="$(printf "%s" "$KEYS" | sed 1d | sort | uniq)"
+FILES="$(printf "%s" "$FILES" | sed 1d | sort | uniq)"
+
+if [ ! "$NUM" -gt 0 ]; then
+	echo "Must be given an integer greater than 0" >&2
+	exit 1
+fi
+
+if [ -z "$KEYS" -o "$(printf "%s\n" "$KEYS" | wc -l)" -le "$NUM" ]; then
+	echo "Must be given more than "$NUM" keys." >&2
+	exit 1
+fi
+
+echo "==NUM"
+echo "$NUM"
+echo "==KEYS"
+echo "$KEYS"
+echo "==FILES"
+echo "$FILES"
