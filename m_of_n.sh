@@ -11,3 +11,22 @@
 # That tarball contains a similar encrypted file for each other key.
 # When given to that person, they can decrypt it to get another tarball to give to any of the others (not including the first)
 # The second last person gets a single file that can be decrypted by any of the people who weren't in the path leading to that file.
+
+keys=""
+inputs=""
+n=""
+
+usage() {
+	(
+	printf "Encrypts given payloads to given keys, such that any N of them could decrypt the payload, but not less.\n"
+	printf "  -n NUM   Number of keys required to decrypt the payloads\n"
+	printf "  -r ID    Key ID of one of the recipients. Can be anything gpg understands\n"
+	printf "  -f FILE  File to encrypt. If FILE is -, read from stdin\n"
+	printf "           If multiple files are given, each of them are encrypted as separate blobs\n"
+	printf "  If no files are given, stdin is assumed.\n"
+	printf "  Other options must be specified. There must be more than NUM IDs given\n"
+	) >&2
+}
+
+usage
+
