@@ -55,6 +55,11 @@ if [ ! "$NUM" -gt 0 ]; then
 	exit 1
 fi
 
+if [ -z "$FILES" ]; then
+	echo "No file given, assuming stdin" >&2
+	FILES="-"
+fi
+
 if [ -z "$KEYS" -o "$(printf "%s\n" "$KEYS" | wc -l)" -le "$NUM" ]; then
 	echo "Must be given more than "$NUM" keys." >&2
 	exit 1
