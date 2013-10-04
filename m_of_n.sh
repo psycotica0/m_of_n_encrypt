@@ -65,9 +65,38 @@ if [ -z "$KEYS" -o "$(printf "%s\n" "$KEYS" | wc -l)" -le "$NUM" ]; then
 	exit 1
 fi
 
-echo "==NUM"
-echo "$NUM"
-echo "==KEYS"
-echo "$KEYS"
-echo "==FILES"
-echo "$FILES"
+# $1 is the file to encrypt, $2 is the list of users to encrypt to, $3 is the number of keys required to decrypt it, $4 is the tempdir that will be cleaned up later
+encrypt_file() {
+	file="$1"
+	keys="$2"
+	num="$3"
+	tempdir="$4"
+	if [ "$num" -eq 1 ]; then
+		# This is the bottom of the tree, here we just encrypt the payload to all of the remaining keys
+		if [ "$file" = "-" ]; then
+			# If we're reading from stdin, then to preserve stdin xargs must read the arguments from a file
+			# The feature or reading from stdin is not supported by posix xargs, but I'll use it anyway
+			# If your xargs doesn't support this, just don't use stdin.
+			args_file="$(mktemp --tmpdir="$tempdir")"
+			printf "%s\n" "$keys" | sed 'i-r'  > "$args_file"
+			printf -- "--encrypt\n-\n" >> "$args_file"
+			xargs -a "$args_file" gpg
+		else
+			(
+			printf "%s\n" "$keys" | sed 'i-r'
+			printf -- "--encrypt\n%s\n" "$file"
+			) | xargs gpg
+		fi
+	else
+		echo "Not Implemented" >&2
+	fi
+}
+
+tempdir="$(mktemp -d)"
+# I have to do it this way to preserve stdin
+IFS="
+"
+for this_file in $FILES; do
+	encrypt_file "$this_file" "$KEYS" "$NUM" "$tempdir"
+done
+rm -rf "$tempdir"
