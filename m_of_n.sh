@@ -71,6 +71,7 @@ encrypt_file() {
 	keys="$2"
 	num="$3"
 	tempdir="$4"
+	filename="$file.$(printf '%s' "$keys" | tr '\n' '.').gpg"
 	if [ "$num" -eq 1 ]; then
 		# This is the bottom of the tree, here we just encrypt the payload to all of the remaining keys
 		if [ "$file" = "-" ]; then
@@ -79,17 +80,18 @@ encrypt_file() {
 			# If your xargs doesn't support this, just don't use stdin.
 			args_file="$(mktemp --tmpdir="$tempdir")"
 			printf "%s\n" "$keys" | sed 'i-r'  > "$args_file"
-			printf -- "--encrypt\n-\n" >> "$args_file"
+			printf -- "-o\n%s\n--encrypt\n-\n" "$filename" >> "$args_file"
 			xargs -a "$args_file" gpg
 		else
 			(
 			printf "%s\n" "$keys" | sed 'i-r'
-			printf -- "--encrypt\n%s\n" "$file"
+			printf -- "-o\n%s\n--encrypt\n%s\n" "$filename" "$file"
 			) | xargs gpg
 		fi
 	else
 		echo "Not Implemented" >&2
 	fi
+	printf "%s\n" "$filename"
 }
 
 tempdir="$(mktemp -d)"
@@ -97,6 +99,6 @@ tempdir="$(mktemp -d)"
 IFS="
 "
 for this_file in $FILES; do
-	encrypt_file "$this_file" "$KEYS" "$NUM" "$tempdir"
+	encrypt_file "$this_file" "$KEYS" "$NUM" "$tempdir" > /dev/null
 done
 rm -rf "$tempdir"
