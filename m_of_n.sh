@@ -16,10 +16,8 @@ usage() {
 	printf "Encrypts given payloads to given keys, such that any N of them could decrypt the payload, but not less.\n"
 	printf "  -n NUM   Number of keys required to decrypt the payloads\n"
 	printf "  -r ID    Key ID of one of the recipients. Can be anything gpg understands\n"
-	printf "  -f FILE  File to encrypt. If FILE is -, read from stdin\n"
-	printf "           If multiple files are given, each of them are encrypted as separate blobs\n"
-	printf "  If no files are given, stdin is assumed.\n"
-	printf "  Other options must be specified. There must be more than NUM IDs given\n"
+	printf "  -f FILE  File to encrypt. If multiple files are given, each of them are encrypted as separate blobs\n"
+	printf "  There must be more than NUM IDs given\n"
 	) >&2
 }
 
@@ -37,7 +35,7 @@ while getopts "hn:r:f:" flag; do
 				exit 1
 			fi;;
 		f) 
-			if [ -r "$OPTARG" -o "$OPTARG" = "-" ]; then
+			if [ -r "$OPTARG" ]; then
 				FILES="$(printf '%s\n%s\n' "$FILES" "$OPTARG")"
 			else
 				echo "\"$OPTARG\" is not a valid file" >&2
@@ -50,14 +48,14 @@ done
 KEYS="$(printf "%s" "$KEYS" | sed 1d | sort | uniq)"
 FILES="$(printf "%s" "$FILES" | sed 1d | sort | uniq)"
 
-if [ ! "$NUM" -gt 0 ]; then
-	echo "Must be given an integer greater than 0" >&2
+if [ -z "$FILES" ]; then
+	echo "No input files given." >&2
 	exit 1
 fi
 
-if [ -z "$FILES" ]; then
-	echo "No file given, assuming stdin" >&2
-	FILES="-"
+if ! [ "$NUM" -gt 0 ]; then
+	echo "Must be given an integer greater than 0" >&2
+	exit 1
 fi
 
 if [ -z "$KEYS" -o "$(printf "%s\n" "$KEYS" | wc -l)" -le "$NUM" ]; then
@@ -74,20 +72,10 @@ encrypt_file() {
 	filename="$file.$(printf '%s' "$keys" | tr '\n' '.').gpg"
 	if [ "$num" -eq 1 ]; then
 		# This is the bottom of the tree, here we just encrypt the payload to all of the remaining keys
-		if [ "$file" = "-" ]; then
-			# If we're reading from stdin, then to preserve stdin xargs must read the arguments from a file
-			# The feature or reading from stdin is not supported by posix xargs, but I'll use it anyway
-			# If your xargs doesn't support this, just don't use stdin.
-			args_file="$(mktemp --tmpdir="$tempdir")"
-			printf "%s\n" "$keys" | sed 'i-r'  > "$args_file"
-			printf -- "-o\n%s\n--encrypt\n-\n" "$filename" >> "$args_file"
-			xargs -a "$args_file" gpg
-		else
-			(
-			printf "%s\n" "$keys" | sed 'i-r'
-			printf -- "-o\n%s\n--encrypt\n%s\n" "$filename" "$file"
-			) | xargs gpg
-		fi
+		(
+		printf "%s\n" "$keys" | sed 'i-r'
+		printf -- "-o\n%s\n--encrypt\n%s\n" "$filename" "$file"
+		) | xargs gpg
 	else
 		# Pull each of the keys out, and get recurse on the rest
 		#   It returns the list of files
@@ -105,9 +93,7 @@ encrypt_file() {
 
 tempdir="$(mktemp -d)"
 # I have to do it this way to preserve stdin
-IFS="
-"
-for this_file in $FILES; do
+printf '%s\n' "$FILES" | while read this_file; do
 	encrypt_file "$this_file" "$KEYS" "$NUM" "$tempdir" > /dev/null
 done
 rm -rf "$tempdir"
