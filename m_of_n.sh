@@ -89,7 +89,16 @@ encrypt_file() {
 			) | xargs gpg
 		fi
 	else
-		echo "Not Implemented" >&2
+		# Pull each of the keys out, and get recurse on the rest
+		#   It returns the list of files
+		#     If that list has more than one item, tar them up and only deal with the tar'd one
+		#   Encrypt that file to the current key
+		#   Return the name of the tar'd files for each key
+		seq 1 "$(printf '%s\n' "$keys" | wc -l)" | while read i; do
+			this_key="$(printf '%s\n' "$keys" | sed -n "${i}p")"
+			other_keys="$(printf '%s\n' "$keys" | sed "${i}d")"
+			sub_files="$(encrypt_file "$file" "$other_keys" "$(expr "$num" - 1)" "$tempdir")"
+		done
 	fi
 	printf "%s\n" "$filename"
 }
