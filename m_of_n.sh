@@ -59,7 +59,7 @@ if ! [ "$NUM" -gt 0 ]; then
 fi
 
 if [ -z "$KEYS" -o "$(printf "%s\n" "$KEYS" | wc -l)" -le "$NUM" ]; then
-	echo "Must be given more than "$NUM" keys." >&2
+	echo "Must be given more than $NUM keys." >&2
 	exit 1
 fi
 
