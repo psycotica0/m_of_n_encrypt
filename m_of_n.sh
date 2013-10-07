@@ -69,13 +69,14 @@ encrypt_file() {
 	keys="$2"
 	num="$3"
 	tempdir="$4"
-	filename="$file.$(printf '%s' "$keys" | tr '\n' '.').gpg"
 	if [ "$num" -eq 1 ]; then
 		# This is the bottom of the tree, here we just encrypt the payload to all of the remaining keys
+		filename="$tempdir/$file.$(printf '%s' "$keys" | tr '\n' '.').gpg"
 		(
 		printf "%s\n" "$keys" | sed 'i-r'
 		printf -- "-o\n%s\n--encrypt\n%s\n" "$filename" "$file"
 		) | xargs gpg
+		printf '%s\n' "$filename"
 	else
 		# Pull each of the keys out, and get recurse on the rest
 		#   It returns the list of files
@@ -85,15 +86,27 @@ encrypt_file() {
 		seq 1 "$(printf '%s\n' "$keys" | wc -l)" | while read i; do
 			this_key="$(printf '%s\n' "$keys" | sed -n "${i}p")"
 			other_keys="$(printf '%s\n' "$keys" | sed "${i}d")"
-			sub_files="$(encrypt_file "$file" "$other_keys" "$(expr "$num" - 1)" "$tempdir")"
+			sub_tempdir="$(mktemp --tmpdir="$tempdir" -d)"
+			sub_files="$(encrypt_file "$file" "$other_keys" "$(expr "$num" - 1)" "$sub_tempdir")"
+			# I'm using tar even if there's only one file
+			# That's to preserve filenames
+			# Otherwise when this file is decrypted, they just get a blob and don't know what it's for
+			old_dir="$(pwd)"
+			cd "$tempdir"
+			to_encrypt="$file.$this_key"
+			# Make a new directory, for making of pretty tarballs
+			mkdir "$to_encrypt"
+			printf '%s\n%s\n' "$sub_files" "$to_encrypt" | xargs mv
+			tar -c "$to_encrypt" | gpg -r "$this_key" --encrypt > "$to_encrypt.tar.gpg"
+			cd "$old_dir"
+			printf '%s\n' "$tempdir/$to_encrypt.tar.gpg"
 		done
 	fi
-	printf "%s\n" "$filename"
 }
 
 tempdir="$(mktemp -d)"
 # I have to do it this way to preserve stdin
 printf '%s\n' "$FILES" | while read this_file; do
-	encrypt_file "$this_file" "$KEYS" "$NUM" "$tempdir" > /dev/null
+	encrypt_file "$this_file" "$KEYS" "$NUM" "$tempdir" | sed '$a.' | xargs mv
 done
 rm -rf "$tempdir"
