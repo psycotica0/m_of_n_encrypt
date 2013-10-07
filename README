@@ -1,0 +1,12 @@
+This script is used to encrypt files to a number of keys in such a way that some N users, working together, can decrypt it.
+
+The reason this was constructed was to encrypt my passwords up so that people close to me can recover them if I should die, but no one of them can get them on their own.
+Just any N of them can do it.
+
+m_of_n.sh -n 3 -f payload -r key1 -r key2 -r key3 -r key4
+
+This will dump a bunch of files in your current directory, one for each key.
+This is layer one.
+
+Beneath this layer is a tarball with files encrypted to the other keys, to give out once you've unrapped a layer.
+At the bottom, after all layers are decrypted, is a file that's encrypted to all the rest of the keys.
